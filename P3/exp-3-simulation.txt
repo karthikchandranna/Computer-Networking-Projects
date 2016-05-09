@@ -1,0 +1,75 @@
+#Simulator object
+set ns [new Simulator]
+
+# Trace file
+set tf [open Trace_File.tr w]
+$ns trace-all $tf
+
+# Finish procedure
+proc finish_proc {} {
+        global ns tf
+        $ns flush-trace
+        close $tf
+        exit 0
+}
+
+# Six nodes
+set n1 [$ns node]
+set n2 [$ns node]
+set n3 [$ns node]
+set n4 [$ns node]
+set n5 [$ns node]
+set n6 [$ns node]
+
+# Links
+$ns duplex-link $n1 $n2 5Mb 10ms DropTail
+$ns duplex-link $n5 $n2 5Mb 10ms DropTail
+$ns duplex-link $n2 $n3 5Mb 10ms DropTail
+$ns duplex-link $n3 $n4 5Mb 10ms DropTail
+$ns duplex-link $n3 $n6 5Mb 10ms DropTail
+
+
+set null_agent [new Agent/Null]
+
+# Queue-size
+$ns queue-limit $n1 $n2 5
+
+# TCP Connection
+set tcp_agent [new Agent/TCP/Reno]
+$ns attach-agent $n1 $tcp_agent
+set sink_agent [new Agent/TCPSink]
+$ns attach-agent $n4 $sink_agent
+$ns connect $tcp_agent $sink_agent
+$tcp_agent set fid_ 1
+
+#FTP over TCP connection
+set ftp_app [new Application/FTP]
+$ftp_app attach-agent $tcp_agent
+$ftp_app set type_ FTP
+
+# UDP Connection
+set udp_agent [new Agent/UDP]
+$ns attach-agent $n5 $udp_agent
+set null_agent [new Agent/Null]
+$ns attach-agent $n6 $null_agent
+$ns connect $udp_agent $null_agent
+#$tcp_agent_2 set fid_ 2
+
+
+set cbr_agent [new Application/Traffic/CBR]
+$cbr_agent attach-agent $udp_agent
+$cbr_agent set type_ CBR
+$cbr_agent set packet_size_ 1000
+$cbr_agent set rate_ 2.5mb
+
+#Scheduling
+$ns at 0.1 "$ftp_app start"
+$ns at 10.0 "$cbr_agent start"
+$ns at 25.0 "$cbr_agent stop"
+$ns at 25.0 "$ftp_app stop"
+
+
+#Finish
+$ns at 26.0 "finish_proc"
+
+$ns run

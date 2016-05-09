@@ -1,0 +1,135 @@
+#!/usr/bin/env python
+
+import re
+import sys
+import os
+
+#f = open('Trace_File.tr', 'r')
+
+#cbr = sys.argv[1]
+bandwidth = 1
+
+print "CBR"+" "+"Throughput"+" "+"Latency"+" "+"Drop"
+
+#seqnAckList = []
+
+while (bandwidth < 7):
+        tclCmd = "/course/cs4700f12/ns-allinone-2.35/bin/ns experiment1.tcl "+str(bandwidth)+"mb"
+        os.system(tclCmd)
+        f = open('Trace_File.tr', 'r')
+
+        latency = 0
+        totalRTT = 0
+        seqNoIndex = 0
+        countSend = 0
+        countRecv = 0
+        timeSendList = []
+        sizeSendList = []
+        seq_noSendList = []
+
+        seq_noRecvList = []
+        timeRecvList = []
+        timeAckList = []
+        ackNoList = []
+
+        totalSendSize = 0
+        totalRecvSize = 0
+        dropCount = 0
+        maxseqnAck = 0
+
+        for line in f:
+#               print line
+                infoSend = re.search( r'^\+(.*)0\s*1\s*tcp(.*)',line)
+                infoRecv = re.search( r'^r(.*)2\s*3\s*tcp(.*)',line)
+                infoDrop = re.search( r'^d(.*)tcp(.*)',line)
+                infoAck = re.search( r'^r(.*)1\s*0\s*ack(.*)',line)
+
+
+                if (infoSend != None):
+       #                info = re.search('tcp',line)
+                        fieldsSend = re.split(' ',infoSend.group())
+                        #timeTCP = fieldsTCP[1]
+                        timeSendList.append(float(fieldsSend[1]))
+        #       sizeSendList.append(float(fieldsSend[5]))
+                        seq_noSendList.append(int(fieldsSend[10]))
+                        totalSendSize += float(fieldsSend[5])
+                        countSend = countSend+1
+                if (infoRecv != None):
+                        fieldsRecv = re.split(' ',infoRecv.group())
+        #       timeRecvList.append(float(fieldsRecv[1]))
+                #total
+                #ack_noList.append(int(fieldsACK[10]))
+
+        #       seq_noRecvList.append(int(fieldsRecv[10]))
+                        countRecv = countRecv+1
+                        totalRecvSize += float(fieldsRecv[5])
+
+                if (infoDrop != None):
+                        dropCount = dropCount+1
+
+                if (infoAck != None):
+                        fieldsAck = re.split(' ',infoAck.group())
+                        timeAckList.append(float(fieldsAck[1]))
+                        ackNoList.append(int(fieldsAck[10]))
+                        maxseqnAck = max(maxseqnAck,(int(fieldsAck[10])))
+
+#print totalSize
+
+        for seqNo in seq_noSendList:
+                for ackNo in ackNoList:
+                        if (seqNo == ackNo):
+                        #print seqNo
+                        #print ackNo
+                        #print "*********"
+                                seqNoSendIndex = seq_noSendList.index(seqNo)
+#                       totalSize += sizeSendList[seqNoSendIndex]
+#                       seqNoRecvIndex = seq_noRecvList.index(seqNoRecv)
+                                ackNoIndex = ackNoList.index(ackNo)
+                        #print "ackNOIndex"
+                        #print ackNoIndex
+                        #print "seqNoIndex"
+                        #print seqNoIndex
+                        #print "------------"
+                        #print timeACKList[ackNoIndex]
+                        #print timeTCPList[seqNoIndex]
+                                totalRTT += timeAckList[ackNoIndex] - timeSendList[seqNoIndex]
+                #               print totalRTT
+                        #       seq_noSendList.remove(seqNo)
+                        #print "==================="
+                        #totalRTT += timeRecvList[seqNoRecvIndex] - timeSendList[seqNoSendIndex]
+        #print countSend
+        #print countRecv
+
+        #print "Send size: "
+        #print totalSendSize
+        #print "Recv Size: "
+        #print totalRecvSize
+#print totalRTT
+
+        if (totalRTT == 0):
+                avgRTT = 0
+                latency = "NA"
+
+        else:
+                avgRTT = totalRTT/(countSend-dropCount)
+                totalRTT += dropCount * 2 * avgRTT
+                latency = totalRTT/countSend
+
+        totalPayload = (maxseqnAck * 1000)
+        goodput = totalPayload/9
+
+
+        goodputKbps = goodput*8/1024
+#       if (countRecv != 0):
+#               latency = 9000.0/countRecv
+#       else:
+#               latency = "NA"
+        #       print "latency in ms: "
+        #       print latency
+#print goodput
+        #print "goodput in Kbps: "
+        print str(bandwidth)+" "+str(goodputKbps)+" "+str(latency)+" "+str(dropCount)
+        #print "packet drop: "
+        #print dropCount
+
+        bandwidth = bandwidth + 0.1

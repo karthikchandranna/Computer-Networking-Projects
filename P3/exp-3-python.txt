@@ -1,0 +1,147 @@
+#!/usr/bin/env python
+
+import re
+import sys
+import os
+
+bandwidth = 1
+simulationTime = 0.0
+
+
+print "         "+"TCPThroughput"+" "+"TCPLatency"+" "+"TCPDropCount"+" "+"CBRThroughput"+" "+"CBRLatency"+" "+"CBRDropCount"
+
+tclCmd = "/course/cs4700f12/ns-allinone-2.35/bin/ns experiment_Queue.tcl"
+os.system(tclCmd)
+
+line = 0
+
+while (simulationTime <= 25.0):
+
+        latency = 0
+        totalRTT = 0
+        seqNoIndex = 0
+        countSend = 0
+        countRecv = 0
+        timeSendList = []
+        sizeSendList = []
+        seq_noSendList = []
+
+        seq_noRecvList = []
+        timeRecvList = []
+        timeAckList = []
+        ackNoList = []
+
+        sizeCbrList = []
+        totalSendSize = 0
+        totalRecvSize = 0
+        dropCount = 0
+        maxseqnAck = 0
+        cbrIndex = 0
+
+        totalCbrSize = 0
+        countCbrSend = 0
+        countCbrRecv = 0
+        timeCbrSendList = []
+        timeCbrRecvList = []
+        sizeCbrRecvList = []
+        sizeCbrSendList = []
+
+        cbrThroughput = 0
+        cbrThroughputKbps = 0
+        countCbrSend = 0
+        countCbrRecv = 0
+        cbrDropCount = 0
+
+
+        f = open('Trace_File.tr', 'r')
+        for line in f:
+                infoSend = re.search( r'^\+(.*)0\s*1\s*tcp(.*)',line)
+                infoRecv = re.search( r'^r(.*)2\s*3\s*tcp(.*)',line)
+                infoDrop = re.search( r'^d(.*)tcp(.*)',line)
+                infoAck = re.search( r'^r(.*)1\s*0\s*ack(.*)',line)
+
+                cbrSend = re.search( r'^\+(.*)4\s*1\s*cbr(.*)',line)
+                cbrRecv = re.search( r'^r(.*)2\s*5\s*cbr(.*)',line)
+                cbrDrop = re.search( r'^d(.*)cbr(.*)',line)
+                if (cbrSend != None):
+                        fieldsCbrSend = re.split(' ',cbrSend.group())
+                        if ((float(fieldsCbrSend[1]) >= simulationTime) and (float(fieldsCbrSend[1]) < (simulationTime+1))):
+                                timeCbrSendList.append(float(fieldsCbrSend[1]))
+                                sizeCbrSendList.append(int(fieldsCbrSend[5]))
+                                countCbrSend += 1
+
+                if (cbrRecv != None):
+                        fieldsCbrRecv = re.split(' ',cbrRecv.group())
+                        if ((float(fieldsCbrRecv[1]) >= simulationTime) and (float(fieldsCbrRecv[1]) < (simulationTime+1))):
+                                timeCbrRecvList.append(float(fieldsCbrRecv[1]))
+                                sizeCbrRecvList.append(int(fieldsCbrRecv[5]))
+                                countCbrRecv += 1
+
+                if (infoSend != None):
+                        fieldsSend = re.split(' ',infoSend.group())
+                        if ((float(fieldsSend[1]) >= simulationTime) and (float(fieldsSend[1]) < (simulationTime+1))):
+                                timeSendList.append(float(fieldsSend[1]))
+                                seq_noSendList.append(int(fieldsSend[10]))
+                                countSend += 1
+
+                if (infoRecv != None):
+                        fieldsRecv = re.split(' ',infoRecv.group())
+                        if ((float(fieldsRecv[1]) >= simulationTime) and (float(fieldsRecv[1]) < (simulationTime+1))):
+                                countRecv += 1
+
+                if (infoDrop != None):
+                        fieldsDrop = re.split(' ',infoDrop.group())
+                        if ((float(fieldsDrop[1]) >= simulationTime) and (float(fieldsDrop[1]) < (simulationTime+1))):
+                                dropCount = dropCount+1
+
+                if (infoAck != None):
+                        fieldsAck = re.split(' ',infoAck.group())
+                        if ((float(fieldsAck[1]) >= simulationTime) and (float(fieldsAck[1]) < (simulationTime+1))):
+                                timeAckList.append(float(fieldsAck[1]))
+                                ackNoList.append(int(fieldsAck[10]))
+                                maxseqnAck = max(maxseqnAck,(int(fieldsAck[10])))
+
+                if (cbrDrop != None):
+                        fieldsCbrDrop = re.split(' ',cbrDrop.group())
+                        if ((float(fieldsCbrDrop[1]) >= simulationTime) and (float(fieldsCbrDrop[1]) < (simulationTime+1))):
+                                cbrDropCount = cbrDropCount+1
+
+
+        totalCbrSize = countCbrRecv * 1000
+        cbrThroughput = totalCbrSize                 # Bytes/sec
+        cbrThroughputKbps = cbrThroughput*8/1024     # Kbps
+
+
+
+        for seqNo in seq_noSendList:
+                for ackNo in ackNoList:
+                        if (seqNo == ackNo):
+                                seqNoSendIndex = seq_noSendList.index(seqNo)
+                                ackNoIndex = ackNoList.index(ackNo)
+                                totalRTT += timeAckList[ackNoIndex] - timeSendList[seqNoSendIndex]
+
+
+        if (totalRTT == 0):
+                avgRTT = 0
+                latency = "NA"
+        else:
+                avgRTT = totalRTT/(countSend-dropCount)
+                totalRTT += dropCount * 2 * avgRTT
+                latency = (totalRTT/countSend)*1000
+
+
+
+        totalPayload = (maxseqnAck * 1000)
+        goodput = totalPayload/9
+
+
+        goodputKbps = goodput*8/1024
+
+
+        if (countCbrRecv != 0):
+                latencyCbr = 1000.0/countCbrRecv    #in milliseconds
+        else:
+                latencyCbr = "NA"
+        print str(simulationTime)+"             "+str(goodputKbps)+" "+str(latency)+" "+str(dropCount)+" "+str(cbrThroughputKbps)+" "+str(latencyCbr)+" "+str(cbrDropCount)
+
+        simulationTime = simulationTime + 1.0

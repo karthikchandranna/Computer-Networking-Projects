@@ -1,0 +1,159 @@
+#!/usr/bin/env python
+
+import re
+import sys
+import os
+
+#f = open('Trace_File.tr', 'r')
+
+#cbr = sys.argv[1]
+bandwidth = 1
+
+print "CBR"+" "+"ThroughputFlow1"+" "+"LatencyFlow1"+" "+"DropRateFlow1"+" "+"ThroughputFlow2"+" "+"LatencyFlow2"+" "+"DropRateFlow2"
+
+#seqnAckList = []
+
+while (bandwidth < 7):
+        tclCmd = "/course/cs4700f12/ns-allinone-2.35/bin/ns experiment2.tcl "+str(bandwidth)+"mb"
+        os.system(tclCmd)
+        f = open('Trace_File.tr', 'r')
+
+        timeSendListFlow1 = []
+        timeSendListFlow2 = []
+        timeAckListFlow1 = []
+        timeAckListFlow2 = []
+        seq_noSendListFlow1 = []
+        seq_noSendListFlow2 = []
+
+        goodputFlow1 = 0
+        goodputFlow2 = 0
+        countRecvFlow1 = 0
+        countRecvFlow2 = 0
+        countDropFlow1 = 0
+        countDropFlow2 = 0
+        countSendFlow1 = 0
+        countSendFlow2 = 0
+
+        maxseqnAckFlow1 = 0
+        maxseqnAckFlow2 = 0
+        seqNoFlow1 = 0
+        ackNoFlow1 = 0
+        seqNoFlow2 = 0
+        ackNoFlow2 = 0
+        seqNoSendIndexFlow1 = 0
+        ackNoIndexFlow1 = 0
+        ackNoIndexFlow2 = 0
+        seqNoSendIndexFlow2 = 0
+        avgRTTFlow1 = 0
+        totalRTTFlow1 = 0
+        avgRTTFlow2 = 0
+        totalRTTFlow2 = 0
+        latencyFlow1 = 0
+        latencyFlow2 = 0
+        ackNoListFlow1 = []
+        ackNoListFlow2 = []
+
+        for line in f:
+#               print line
+                infoSendFlow1 = re.search( r'^\+(.*)0\s*1\s*tcp(.*)',line)
+                infoSendFlow2 = re.search( r'^\+(.*)4\s*1\s*tcp(.*)',line)
+                #infoDrop = re.search( r'^d(.*)tcp(.*)',line)
+
+                infoAckFlow1 = re.search( r'^r(.*)1\s*0\s*ack(.*)',line)     #For throughput calc
+                infoAckFlow2 = re.search( r'^r(.*)1\s*4\s*ack(.*)',line)
+
+                infoRecvFlow1 = re.search( r'^r(.*)2\s*3\s*tcp(.*)',line)    #For latency calc
+                infoRecvFlow2 = re.search( r'^r(.*)2\s*5\s*tcp(.*)',line)
+
+                infoDropFlow1 = re.search( r'^d(.*)tcp(.*)0\.0\s*3\.0(.*)',line)   #For droprate calc
+                infoDropFlow2 = re.search( r'^d(.*)tcp(.*)4\.0\s*5\.0(.*)',line)
+
+#               print infoDropFlow1
+#               print infoDropFlow2
+
+                if (infoSendFlow1 != None):
+                        fieldsSendFlow1 = re.split(' ',infoSendFlow1.group())
+                        timeSendListFlow1.append(float(fieldsSendFlow1[1]))
+                        seq_noSendListFlow1.append(int(fieldsSendFlow1[10]))
+
+                if (infoSendFlow2 != None):
+                        fieldsSendFlow2 = re.split(' ',infoSendFlow2.group())
+                        timeSendListFlow2.append(float(fieldsSendFlow2[1]))
+                        seq_noSendListFlow2.append(int(fieldsSendFlow2[10]))
+
+                if (infoAckFlow1 != None):
+                        fieldsAckFlow1 = re.split(' ',infoAckFlow1.group())
+                        timeAckListFlow1.append(float(fieldsAckFlow1[1]))
+                        ackNoListFlow1.append(int(fieldsAckFlow1[10]))
+                        maxseqnAckFlow1 = max(maxseqnAckFlow1,int(fieldsAckFlow1[10]))
+
+                if (infoAckFlow2 != None):
+                        fieldsAckFlow2 = re.split(' ',infoAckFlow2.group())
+                        ackNoListFlow2.append(int(fieldsAckFlow2[10]))
+                        timeAckListFlow2.append(float(fieldsAckFlow2[1]))
+                        maxseqnAckFlow2 = max(maxseqnAckFlow2,int(fieldsAckFlow2[10]))
+
+                if (infoRecvFlow1 != None):
+                        countRecvFlow1 = countRecvFlow1+1
+
+                if (infoRecvFlow2 != None):
+                        countRecvFlow2 = countRecvFlow2+1
+
+                if (infoDropFlow1 != None):
+                        countDropFlow1 = countDropFlow1+1
+
+                if (infoDropFlow2 != None):
+                        countDropFlow2 = countDropFlow2+1
+
+                if (infoSendFlow1 != None):
+                        countSendFlow1 = countSendFlow1+1
+
+                if (infoSendFlow2 != None):
+                        countSendFlow2 = countSendFlow2+1
+
+
+        for seqNoFlow1 in seq_noSendListFlow1:
+                for ackNoFlow1 in ackNoListFlow1:
+                        if (seqNoFlow1 == ackNoFlow1):
+                                seqNoSendIndexFlow1 = seq_noSendListFlow1.index(seqNoFlow1)
+                                ackNoIndexFlow1 = ackNoListFlow1.index(ackNoFlow1)
+                                totalRTTFlow1 += timeAckListFlow1[ackNoIndexFlow1] - timeSendListFlow1[seqNoSendIndexFlow1]
+
+        for seqNoFlow2 in seq_noSendListFlow2:
+                for ackNoFlow2 in ackNoListFlow2:
+                        if (seqNoFlow2 == ackNoFlow2):
+                                seqNoSendIndexFlow2 = seq_noSendListFlow2.index(seqNoFlow2)
+                                ackNoIndexFlow2 = ackNoListFlow2.index(ackNoFlow2)
+                                totalRTTFlow2 += timeAckListFlow2[ackNoIndexFlow2] - timeSendListFlow2[seqNoSendIndexFlow2]
+
+        totalPayloadFlow1 = (maxseqnAckFlow1 * 1000)
+        goodputFlow1 = totalPayloadFlow1/9
+        goodputKbpsFlow1 = goodputFlow1*8/1024
+
+        totalPayloadFlow2 = (maxseqnAckFlow2 * 1000)
+        goodputFlow2 = totalPayloadFlow2/9
+        goodputKbpsFlow2 = goodputFlow2*8/1024
+
+
+        if (totalRTTFlow1 == 0):
+                avgRTTFlow1 = 0
+                latencyFlow1 = "NA"
+        else:
+                avgRTTFlow1 = totalRTTFlow1/(countSendFlow1-countDropFlow1)
+                totalRTTFlow1 += countDropFlow1 * 2 * avgRTTFlow1
+                latencyFlow1 = totalRTTFlow1/countSendFlow1
+
+        if (totalRTTFlow2 == 0):
+                avgRTTFlow2 = 0
+                latencyFlow2 = "NA"
+        else:
+                avgRTTFlow2 = totalRTTFlow2/(countSendFlow2-countDropFlow2)
+                totalRTTFlow2 += countDropFlow2 * 2 * avgRTTFlow2
+                latencyFlow2 = totalRTTFlow2/countSendFlow2
+
+        droprateFlow1 = (float(countDropFlow1)/float(countSendFlow1))*100.0
+        droprateFlow2 = (float(countDropFlow2)/float(countSendFlow2))*100.0
+
+        print str(bandwidth)+" "+str(goodputKbpsFlow1)+" "+str(latencyFlow1)+" "+str(droprateFlow1)+" "+str(goodputKbpsFlow2)+" "+str(latencyFlow2)+" "+str(droprateFlow2)
+
+        bandwidth = bandwidth + 0.1
